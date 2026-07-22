@@ -1,0 +1,21 @@
+node_modules
+# Node & Frontend (React/Vue)
+node_modules/
+dist/
+build/
+.env
+
+# Python AI Backend
+__pycache__/
+venv/
+env/
+*.pyc
+
+# Biometric & Ledger Data
+face_db/
+voted.json
+
+# Hardhat Blockchain
+artifacts/
+cache/
+typechain-types/
