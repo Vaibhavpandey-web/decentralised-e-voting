@@ -19,5 +19,14 @@ module.exports = {
     version: "0.8.24",
     settings: { optimizer: { enabled: true, runs: 200 } },
   },
-  networks: { localhost: { url: "http://127.0.0.1:8545" } },
+  networks: {
+    localhost: { url: "http://127.0.0.1:8545" },
+    ...(process.env.SEPOLIA_RPC_URL ? {
+      sepolia: {
+        url: process.env.SEPOLIA_RPC_URL,
+        chainId: 11155111,
+        accounts: process.env.DEPLOYER_PRIVATE_KEY ? [process.env.DEPLOYER_PRIVATE_KEY] : [],
+      },
+    } : {}),
+  },
 };
