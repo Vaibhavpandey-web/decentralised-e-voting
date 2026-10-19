@@ -19,3 +19,9 @@ voted.json
 artifacts/
 cache/
 typechain-types/
+.venv/
+.env.*
+!.env.example
+*.sqlite3*
+deployment.local.json
+.pytest_cache/
