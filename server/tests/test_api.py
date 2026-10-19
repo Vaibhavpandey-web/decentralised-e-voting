@@ -1,4 +1,6 @@
 import importlib.util
+import os
+import uuid
 from pathlib import Path
 import numpy as np
 import pytest
@@ -8,11 +10,28 @@ from eth_abi import encode
 from eth_utils import keccak
 @pytest.fixture
 def api(tmp_path,monkeypatch):
+    test_url = os.getenv('TEST_DATABASE_URL')
+    monkeypatch.delenv('DATABASE_URL', raising=False)
+    schema = None
+    if test_url:
+        import psycopg
+        from psycopg.conninfo import make_conninfo
+        schema = 'test_' + uuid.uuid4().hex
+        with psycopg.connect(test_url) as con:
+            con.execute(f'CREATE SCHEMA {schema}')
+            con.execute(f'SET search_path TO {schema}')
+            con.execute((Path(__file__).parents[1]/'migrations/001_initial.sql').read_text())
+        monkeypatch.setenv('DATABASE_URL', make_conninfo(test_url, options=f'-c search_path={schema}'))
     for key,value in {'DATABASE_PATH':str(tmp_path/'test.sqlite3'),'ADMIN_TOKEN':'a'*40,'IDENTITY_SECRET':'i'*40,'VERIFIER_PRIVATE_KEY':'0x'+'11'*32,'CONTRACT_ADDRESS':'0x'+'22'*20}.items():monkeypatch.setenv(key,value)
     spec=importlib.util.spec_from_file_location('civic_api',Path(__file__).parents[1]/'app.py');module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
     module.app.config['TESTING']=True;module.limiter.enabled=False
     monkeypatch.setattr(module,'face_sample',lambda frame:(np.ones(128),{}))
-    return module,module.app.test_client()
+    try:
+        yield module,module.app.test_client()
+    finally:
+        if schema:
+            with psycopg.connect(test_url) as con:
+                con.execute(f'DROP SCHEMA {schema} CASCADE')
 def enroll(client,voter,roll='CSE001'):
     return client.post('/register',json={'roll_no':roll,'wallet':voter.address,'image':'mock','consent':True},headers={'Authorization':'Bearer '+'a'*40})
 def test_enrollment_requires_admin(api):

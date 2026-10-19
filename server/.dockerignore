@@ -3,3 +3,7 @@
 !requirements.txt
 !app.py
 !gunicorn.conf.py
+!tests/
+!tests/**
+!migrations/
+!migrations/**

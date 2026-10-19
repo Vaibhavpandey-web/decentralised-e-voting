@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import secrets
 import sqlite3
+from contextlib import contextmanager
 import time
 import numpy as np
 from dotenv import load_dotenv
@@ -33,14 +34,45 @@ CONTRACT = os.getenv('CONTRACT_ADDRESS','')
 CHAIN_ID = int(os.getenv('CHAIN_ID','31337'))
 TOLERANCE = .45
 
-def db():
-    con = sqlite3.connect(DB, timeout=10)
-    con.row_factory = sqlite3.Row
-    return con
+DATABASE_URL = os.getenv('DATABASE_URL', '')
+if DATABASE_URL:
+    import psycopg
+    from psycopg.rows import dict_row
+    INTEGRITY_ERRORS = (sqlite3.IntegrityError, psycopg.IntegrityError)
+else:
+    INTEGRITY_ERRORS = (sqlite3.IntegrityError,)
 
-with db() as con:
-    con.executescript('''CREATE TABLE IF NOT EXISTS voters (roll TEXT PRIMARY KEY, wallet TEXT UNIQUE NOT NULL, encoding BLOB NOT NULL);
-    CREATE TABLE IF NOT EXISTS challenges (nonce TEXT PRIMARY KEY, roll TEXT NOT NULL, wallet TEXT NOT NULL, message TEXT NOT NULL, expires INTEGER NOT NULL);''')
+class PostgresConnection:
+    def __init__(self, connection):
+        self.connection = connection
+
+    def execute(self, sql, params=()):
+        if sql == 'BEGIN IMMEDIATE':
+            # Serialize enrollment scans and challenge consumption across all
+            # processes. Transaction-scoped locks work with pooled connections.
+            return self.connection.execute('SELECT pg_advisory_xact_lock(73491821)')
+        return self.connection.execute(sql.replace('?', '%s'), params)
+
+@contextmanager
+def db():
+    if DATABASE_URL:
+        with psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=15) as con:
+            yield PostgresConnection(con)
+    else:
+        con = sqlite3.connect(DB, timeout=10)
+        con.row_factory = sqlite3.Row
+        try:
+            with con:
+                yield con
+        finally:
+            con.close()
+
+# Versioned initial schema is checked in alongside the application. Hosted
+# databases are migrated separately; local SQLite initializes for development.
+if not DATABASE_URL:
+    with db() as con:
+        con.executescript('''CREATE TABLE IF NOT EXISTS voters (roll TEXT PRIMARY KEY, wallet TEXT UNIQUE NOT NULL, encoding BLOB NOT NULL);
+        CREATE TABLE IF NOT EXISTS challenges (nonce TEXT PRIMARY KEY, roll TEXT NOT NULL, wallet TEXT NOT NULL, message TEXT NOT NULL, expires INTEGER NOT NULL);''')
 
 def fail(message, status=400):
     return jsonify(status='error',message=message), status
@@ -134,7 +166,7 @@ def register():
                 if np.linalg.norm(np.frombuffer(row['encoding'],dtype=np.float64)-encoding)<TOLERANCE:
                     return fail('This face is already enrolled. Contact the administrator.',409)
             con.execute('INSERT INTO voters VALUES (?,?,?)',(roll,wallet,encoding.astype(np.float64).tobytes()))
-    except sqlite3.IntegrityError: return fail('This voter ID or wallet is already enrolled.',409)
+    except INTEGRITY_ERRORS: return fail('This voter ID or wallet is already enrolled.',409)
     return jsonify(status='success')
 
 @app.post('/challenge')

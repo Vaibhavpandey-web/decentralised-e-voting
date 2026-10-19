@@ -5,7 +5,19 @@ Frontend: https://decentralised-e-voting.vercel.app
 The frontend alone does not enable voting. Complete the following setup before
 enrolling any real voters. Use test participants with informed consent.
 
-## Biometric API on Render
+## Free hosted configuration
+
+Use Render Free with Neon PostgreSQL instead of a persistent disk. The project
+`civic-evoting` has its schema in `server/migrations/001_initial.sql`. Apply that
+migration using a direct PostgreSQL connection; give the API a pooled
+`DATABASE_URL`. Secrets are configured in Render, never in the frontend.
+No existing SQLite voter records are copied automatically.
+
+Free Render services sleep when idle. PostgreSQL preserves voter records and
+challenges through restarts. Measure real-camera memory usage before relying on
+512 MB of RAM; a successful build is not proof that biometric verification fits.
+
+## Alternative: paid disk-based API on Render
 
 Create a Docker web service from this repository, branch `codex/evoting-redesign`.
 Set root directory `server`, Dockerfile `./Dockerfile`, health check `/health`,

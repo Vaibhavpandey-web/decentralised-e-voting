@@ -10,6 +10,8 @@ COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
 WORKDIR /app
 COPY app.py gunicorn.conf.py ./
+COPY tests ./tests
+COPY migrations ./migrations
 ENV PYTHONUNBUFFERED=1 DATABASE_PATH=/var/data/voters.sqlite3
 RUN mkdir -p /var/data
 EXPOSE 10000
