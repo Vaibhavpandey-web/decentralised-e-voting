@@ -7,3 +7,4 @@
 !tests/**
 !migrations/
 !migrations/**
+!start.py

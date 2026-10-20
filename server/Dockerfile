@@ -10,10 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends libopenblas0 li
 COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
 WORKDIR /app
-COPY app.py gunicorn.conf.py ./
+COPY app.py gunicorn.conf.py start.py ./
 COPY tests ./tests
 COPY migrations ./migrations
 ENV PYTHONUNBUFFERED=1 DATABASE_PATH=/var/data/voters.sqlite3
 RUN mkdir -p /var/data
 EXPOSE 10000
-CMD ["gunicorn", "--config", "gunicorn.conf.py", "app:app"]
+ENTRYPOINT ["python", "start.py"]
