@@ -146,7 +146,13 @@ def unexpected(exc):
     app.logger.exception('Verification service error')
     return fail('Verification service error. Contact the election administrator.',500)
 @app.get('/health')
-def health(): return jsonify(status='ready' if configured() else 'configuration_required')
+def health():
+    try:
+        with db() as con:
+            con.execute('SELECT 1').fetchone()
+    except Exception:
+        return jsonify(status='unavailable', database='unavailable'), 503
+    return jsonify(status='ready' if configured() else 'configuration_required', database='connected', chain_id=CHAIN_ID)
 
 @app.post('/register')
 @limiter.limit('10 per minute')
