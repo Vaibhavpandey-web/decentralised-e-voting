@@ -11,6 +11,11 @@ from eth_utils import keccak
 @pytest.fixture
 def api(tmp_path,monkeypatch):
     test_url = os.getenv('TEST_DATABASE_URL')
+    if test_url:
+        from urllib.parse import urlsplit, urlunsplit
+        parts = urlsplit(test_url)
+        test_url = urlunsplit(parts._replace(netloc=parts.netloc.replace('-pooler.', '.')))
+
     monkeypatch.delenv('DATABASE_URL', raising=False)
     schema = None
     if test_url:
@@ -22,7 +27,7 @@ def api(tmp_path,monkeypatch):
             con.execute(f'SET search_path TO {schema}')
             con.execute((Path(__file__).parents[1]/'migrations/001_initial.sql').read_text())
         monkeypatch.setenv('DATABASE_URL', make_conninfo(test_url, options=f'-c search_path={schema}'))
-    for key,value in {'DATABASE_PATH':str(tmp_path/'test.sqlite3'),'ADMIN_TOKEN':'a'*40,'IDENTITY_SECRET':'i'*40,'VERIFIER_PRIVATE_KEY':'0x'+'11'*32,'CONTRACT_ADDRESS':'0x'+'22'*20}.items():monkeypatch.setenv(key,value)
+    for key,value in {'CHAIN_ID':'31337','DATABASE_PATH':str(tmp_path/'test.sqlite3'),'ADMIN_TOKEN':'a'*40,'IDENTITY_SECRET':'i'*40,'VERIFIER_PRIVATE_KEY':'0x'+'11'*32,'CONTRACT_ADDRESS':'0x'+'22'*20}.items():monkeypatch.setenv(key,value)
     spec=importlib.util.spec_from_file_location('civic_api',Path(__file__).parents[1]/'app.py');module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
     module.app.config['TESTING']=True;module.limiter.enabled=False
     monkeypatch.setattr(module,'face_sample',lambda frame:(np.ones(128),{}))
